@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 import RPi.GPIO as GPIO
+# --------------------------------------------------------------------------
+# WIRING DIAGRAM (RC522 -> Raspberry Pi)
+# --------------------------------------------------------------------------
+# SDA (SS)  -> Pin 24 (GPIO 8)
+# SCK       -> Pin 23 (GPIO 11)
+# MOSI      -> Pin 19 (GPIO 10)
+# MISO      -> Pin 21 (GPIO 9)
+# IRQ       -> (Not Connected)
+# GND       -> Pin 6  (Ground)
+# RST       -> Pin 22 (GPIO 25)
+# 3.3V      -> Pin 1  (3.3V)  <-- IMPORTANT: DO NOT CONNECT TO 5V
+# --------------------------------------------------------------------------
+
 from mfrc522 import SimpleMFRC522
 import time
 
