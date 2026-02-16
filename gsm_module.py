@@ -59,19 +59,3 @@ class GSMModule:
             self.ser.close()
             print("Serial port closed.")
 
-if __name__ == "__main__":
-    # Example usage for testing the GSM module
-    # Note: This will likely fail on a Windows machine as the serial port won't exist.
-    # It's meant to be run on the Raspberry Pi.
-    
-    # Use a dummy port for testing on non-Pi environments if needed,
-    # but expect serial.SerialException.
-    dummy_port = "COM1" # Replace with actual port on Pi, e.g., "/dev/ttyS0"
-    
-    gsm = GSMModule(dummy_port, 9600)
-    
-    # Only attempt to send SMS if serial port was opened successfully
-    if gsm.ser:
-        gsm.send_sms("+15551234567", "Hello from SmartAttendance!")
-    else:
-        print("GSM module not functional due to serial port issue. Cannot send test SMS.")

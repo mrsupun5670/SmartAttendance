@@ -6,9 +6,11 @@
 
 class NFCReader:
     def __init__(self):
-        print("NFCReader initialized (placeholder).")
-        # In a real scenario, you would initialize SPI communication here
-        # and the MFRC522 chip.
+        # We import here to avoid dependency issues if running on non-Pi environment during dev
+        import config
+        print(f"NFCReader initialized. Using SPI Device {config.NFC_SPI_DEVICE} (CE{config.NFC_SPI_DEVICE}) and RST Pin {config.NFC_RST_PIN}.")
+        # In a real scenario, you would initialize SPI communication here:
+        # self.reader = MFRC522(device=config.NFC_SPI_DEVICE, pin_rst=config.NFC_RST_PIN)
 
     def read_card_id(self):
         """
@@ -24,7 +26,3 @@ class NFCReader:
         print(f"NFC card detected: {dummy_card_id}")
         return dummy_card_id
 
-if __name__ == "__main__":
-    reader = NFCReader()
-    card_id = reader.read_card_id()
-    print(f"Read card ID: {card_id}")

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f6f9;
+        }
+
+        .card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header text-center">
+        <h1>Smart Attendance Dashboard</h1>
+        <p>Manage Students & View Logs</p>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <!-- Add Student Form -->
+            <div class="col-md-4">
+                <div class="card p-3 mb-4">
+                    <h4>Add New Student</h4>
+                    <form id="addStudentForm">
+                        <div class="mb-3">
+                            <label>ROI Card UID</label>
+                            <input type="text" class="form-control" id="uid" placeholder="e.g. 19,127,222,53" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Student Name</label>
+                            <input type="text" class="form-control" id="name" placeholder="John Doe" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Parent Phone</label>
+                            <input type="text" class="form-control" id="phone" placeholder="+947..." required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Class/Grade</label>
+                            <input type="text" class="form-control" id="class" placeholder="Grade 10-A" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Add Student</button>
+                        <div id="statusMsg" class="mt-2 small"></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Attendance Log -->
+            <div class="col-md-8">
+                <div class="card p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4>Recent Attendance</h4>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="loadAttendance()">Refresh</button>
+                    </div>
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Name</th>
+                                <th>Device</th>
+                                <th>StatusMessage</th> <!-- Renamed from 'Type' to be clearer -->
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTable">
+                            <tr>
+                                <td colspan="4" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --------------------------------------------------------
+        // TODO: PASTE YOUR GOOGLE SCRIPT WEB APP URL HERE
+        // --------------------------------------------------------
+        const API_URL = "https://script.google.com/macros/s/AKfycby8QjOohMtw2NpOMpLytM2_LI-lwb39g3Cc2Kaj7FTaRMUb6O744m2mm1uv3724IqY/exec";
+        // --------------------------------------------------------
+
+        async function loadAttendance() {
+            if (API_URL.includes("REPLACE")) {
+                document.querySelector("#attendanceTable").innerHTML = "<tr><td colspan='4' class='text-danger text-center'>Please configure API_URL in index.html</td></tr>";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}?action=getAttendance`);
+                const data = await response.json();
+                const tbody = document.querySelector("#attendanceTable");
+                tbody.innerHTML = "";
+
+                data.forEach(row => {
+                    // row format from GAS: [timestamp, uid, name, device, type]
+                    const date = new Date(row[0]).toLocaleString();
+                    const html = `<tr>
+                    <td>${date}</td>
+                    <td>${row[2]} (${row[1]})</td>
+                    <td><span class="badge bg-info text-dark">${row[3]}</span></td>
+                    <td>${row[4]}</td>
+                </tr>`;
+                    tbody.innerHTML += html;
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        document.getElementById("addStudentForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector("button");
+            const status = document.getElementById("statusMsg");
+
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+            status.innerText = "";
+
+            const payload = {
+                action: "addStudent",
+                uid: document.getElementById("uid").value,
+                name: document.getElementById("name").value,
+                phone: document.getElementById("phone").value,
+                class: document.getElementById("class").value
+            };
+
+            // GitHub Pages to Google Script requires 'no-cors' or handle CORS properly in GAS
+            // Usually, GAS Web App return redirects which fetch handles awkwardly.
+            // We use 'no-cors' mode but we won't get a JSON response back easily.
+            // Alternatively, use proper POST with text/plain to avoid preflight.
+
+            try {
+                await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify(payload),
+                    headers: { "Content-Type": "text/plain" } // Avoids CORS preflight
+                });
+
+                // Assuming success if no network error
+                status.innerText = "Student Added!";
+                status.className = "mt-2 small text-success";
+                e.target.reset();
+            } catch (error) {
+                status.innerText = "Error adding student.";
+                status.className = "mt-2 small text-danger";
+            }
+
+            btn.disabled = false;
+            btn.innerText = "Add Student";
+        });
+
+        // Load on start
+        loadAttendance();
+    </script>
+</body>
+
+</html>

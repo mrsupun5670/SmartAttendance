@@ -4,12 +4,16 @@
 # Database settings
 DATABASE_NAME = "attendance.db"
 
-# NFC Reader settings (example, actual pins will depend on wiring)
+# NFC Reader settings
+# Note: SPI Device 0 (CE0) is used by the XPT2046 Display.
+# We must use Device 1 (CE1) for the RFID reader.
 NFC_SPI_PORT = 0
-NFC_SPI_DEVICE = 0
+NFC_SPI_DEVICE = 1      # CE1 (GPIO 7)
+NFC_RST_PIN = 24        # Reset pin for RFID (GPIO 24)
 
-# GSM Module settings (example, actual serial port will depend on connection)
-GSM_SERIAL_PORT = "/dev/ttyS0" # Common for Raspberry Pi, might be /dev/ttyAMA0 or /dev/ttyUSB0
+# GSM Module settings
+# Raspberry Pi 3/4 typically uses /dev/serial0 which maps to the correct UART
+GSM_SERIAL_PORT = "/dev/serial0" 
 GSM_BAUDRATE = 9600
 
 # Parent phone numbers (example)
