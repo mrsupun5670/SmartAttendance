@@ -32,6 +32,11 @@ class AttendanceApp:
         self.notebook.add(self.frame_manage, text='Manage Students')
         self.setup_manage(self.frame_manage)
         
+        # Tab 3: Attendance Records
+        self.frame_attendance = ttk.Frame(self.notebook)
+        self.notebook.add(self.frame_attendance, text='Attendance Records')
+        self.setup_attendance(self.frame_attendance)
+        
     # ----------------------------------------------------------------------
     # DASHBOARD
     # ----------------------------------------------------------------------
@@ -94,9 +99,13 @@ class AttendanceApp:
         btn_frame = ttk.Frame(parent)
         btn_frame.pack(fill='x', padx=10, pady=10)
         
-        ttk.Button(btn_frame, text="Refresh List", command=self.refresh_list).pack(side='left', padx=5)
+        ttk.Button(btn_frame, text="Refresh (Local)", command=self.refresh_list).pack(side='left', padx=5)
+        self.btn_sync = ttk.Button(btn_frame, text="Sync Cloud DB", command=self.sync_cloud)
+        self.btn_sync.pack(side='left', padx=5)
+        
         ttk.Button(btn_frame, text="Add Student (Scan)", command=self.add_student_flow).pack(side='right', padx=5)
         ttk.Button(btn_frame, text="Delete Selected", command=self.delete_student).pack(side='right', padx=5)
+        ttk.Button(btn_frame, text="Update Selected", command=self.update_student_flow).pack(side='right', padx=5)
         
         self.refresh_list()
 
@@ -175,6 +184,41 @@ class AttendanceApp:
         else:
             messagebox.showerror("Error", "Failed to save to Cloud.")
 
+    def sync_cloud(self):
+        self.btn_sync.config(state='disabled')
+        def worker():
+            self.system.sync_students_from_sheet()
+            self.root.after(0, self.refresh_list)
+            self.root.after(0, lambda: self.btn_sync.config(state='normal'))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def update_student_flow(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select a student first.")
+            return
+            
+        item_values = self.tree.item(selected[0])['values']
+        uid = str(item_values[0])
+        current_name = str(item_values[1])
+        current_phone = str(item_values[2])
+        current_class = str(item_values[3])
+        
+        name = simpledialog.askstring("Update", f"Update Name for {uid}:", initialvalue=current_name)
+        if name is None: return
+        
+        phone = simpledialog.askstring("Update", "Update Parent Phone:", initialvalue=current_phone)
+        if phone is None: return
+        
+        student_class = simpledialog.askstring("Update", "Update Class:", initialvalue=current_class)
+        if student_class is None: return
+        
+        if self.system.update_student(uid, name, phone, student_class):
+            messagebox.showinfo("Success", "Student Updated Successfully!")
+            self.refresh_list()
+        else:
+            messagebox.showerror("Error", "Failed to update on Cloud.")
+
     def delete_student(self):
         selected = self.tree.selection()
         if not selected:
@@ -189,6 +233,71 @@ class AttendanceApp:
                 self.refresh_list()
             else:
                 messagebox.showerror("Error", "Failed to delete from Cloud.")
+
+    # ----------------------------------------------------------------------
+    # ATTENDANCE RECORDS
+    # ----------------------------------------------------------------------
+    def setup_attendance(self, parent):
+        # Top Controls
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(fill='x', padx=10, pady=5)
+        
+        self.btn_refresh_att = ttk.Button(btn_frame, text="Fetch Latest Logs", command=self.refresh_attendance)
+        self.btn_refresh_att.pack(side='left', padx=5)
+        
+        # Sub-Notebook for Units
+        self.att_notebook = ttk.Notebook(parent)
+        self.att_notebook.pack(expand=True, fill='both', padx=10, pady=5)
+        
+        # School Unit Tab
+        self.frame_school = ttk.Frame(self.att_notebook)
+        self.att_notebook.add(self.frame_school, text="School Unit")
+        
+        self.tree_school = ttk.Treeview(self.frame_school, columns=('Time', 'UID', 'Name', 'Action'), show='headings')
+        self.tree_school.heading('Time', text='Time')
+        self.tree_school.heading('UID', text='UID')
+        self.tree_school.heading('Name', text='Student Name')
+        self.tree_school.heading('Action', text='Action')
+        self.tree_school.pack(expand=True, fill='both', padx=10, pady=10)
+        
+        # Bus Unit Tab
+        self.frame_bus = ttk.Frame(self.att_notebook)
+        self.att_notebook.add(self.frame_bus, text="Bus Unit")
+
+        self.tree_bus = ttk.Treeview(self.frame_bus, columns=('Time', 'UID', 'Name', 'Action'), show='headings')
+        self.tree_bus.heading('Time', text='Time')
+        self.tree_bus.heading('UID', text='UID')
+        self.tree_bus.heading('Name', text='Student Name')
+        self.tree_bus.heading('Action', text='Action')
+        self.tree_bus.pack(expand=True, fill='both', padx=10, pady=10)
+
+    def refresh_attendance(self):
+        self.btn_refresh_att.config(state='disabled')
+        def worker():
+            records = self.system.get_attendance_records()
+            self.root.after(0, lambda: self.populate_attendance(records))
+            self.root.after(0, lambda: self.btn_refresh_att.config(state='normal'))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def populate_attendance(self, records):
+        for item in self.tree_school.get_children():
+            self.tree_school.delete(item)
+        for item in self.tree_bus.get_children():
+            self.tree_bus.delete(item)
+            
+        for row in records:
+            if len(row) < 5: continue
+            time_val = row[0]
+            uid = row[1]
+            name = row[2]
+            unit = str(row[3]).upper()
+            action = row[4]
+            
+            val = (time_val, uid, name, action)
+            if "BUS" in unit:
+                self.tree_bus.insert('', 'end', values=val)
+            else:
+                self.tree_school.insert('', 'end', values=val)
 
     def on_close(self):
         if self.system.running:

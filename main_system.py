@@ -120,9 +120,12 @@ class SmartAttendance:
             new_cache = {}
             for row in records:
                 uid = str(row['UID']).strip()
+                phone_str = str(row['ParentPhone']).strip()
+                if phone_str.startswith("'") or phone_str.startswith(","):
+                    phone_str = phone_str[1:]
                 new_cache[uid] = {
                     "Name": row['Name'],
-                    "ParentPhone": str(row['ParentPhone']).strip(),
+                    "ParentPhone": phone_str,
                     "Class": row.get('Class', '')
                 }
             self.students_cache = new_cache
@@ -147,8 +150,8 @@ class SmartAttendance:
         try:
             client = self.get_google_client()
             sheet = client.open(SHEET_NAME).worksheet("Students")
-            # UID, Name, Class, ParentPhone
-            sheet.append_row([uid, name, student_class, phone])
+            # UID, Name, ParentPhone, Class
+            sheet.append_row([uid, name, phone, student_class], value_input_option='USER_ENTERED')
             self.log(f"[CLOUD] Added Student: {name}")
             # Refresh Cache
             self.sync_students_from_sheet()
@@ -158,16 +161,42 @@ class SmartAttendance:
             return False
 
     def delete_student(self, uid):
+        uid = str(uid)
         try:
             client = self.get_google_client()
             sheet = client.open(SHEET_NAME).worksheet("Students")
-            cell = sheet.find(uid)
-            sheet.delete_rows(cell.row)
+            cell = sheet.find(uid, in_column=1)
+            if cell is None:
+                self.log(f"[ERROR] Delete Failed: UID {uid} not found on Cloud DB.")
+                return False
+                
+            sheet.delete_row(cell.row)
             self.log(f"[CLOUD] Deleted Student UID: {uid}")
             self.sync_students_from_sheet()
             return True
         except Exception as e:
             self.log(f"[ERROR] Delete Student Failed: {e}")
+            return False
+
+    def update_student(self, uid, name, phone, student_class):
+        uid = str(uid)
+        try:
+            client = self.get_google_client()
+            sheet = client.open(SHEET_NAME).worksheet("Students")
+            cell = sheet.find(uid, in_column=1)
+            if cell is None:
+                self.log(f"[ERROR] Update Failed: UID {uid} not found on Cloud DB.")
+                return False
+                
+            row = cell.row
+            sheet.update_cell(row, 2, name)
+            sheet.update_cell(row, 3, phone)
+            sheet.update_cell(row, 4, student_class)
+            self.log(f"[CLOUD] Updated Student UID: {uid}")
+            self.sync_students_from_sheet()
+            return True
+        except Exception as e:
+            self.log(f"[ERROR] Update Student Failed: {e}")
             return False
 
     def upload_attendance_log(self, uid, name, log_type):
@@ -180,6 +209,22 @@ class SmartAttendance:
         except Exception as e:
             self.log(f"[CLOUD] Log Upload Failed: {e}")
 
+    def get_attendance_records(self):
+        try:
+            client = self.get_google_client()
+            sheet = client.open(SHEET_NAME).worksheet("Attendance")
+            records = sheet.get_all_values()
+            
+            if len(records) <= 1:
+                return []
+                
+            data = records[1:]
+            data.reverse() # Newest first
+            return data
+        except Exception as e:
+            self.log(f"[ERROR] Fetch Attendance Failed: {e}")
+            return []
+
     # --------------------------------------------------------------------------
     # SMS
     # --------------------------------------------------------------------------
@@ -188,14 +233,24 @@ class SmartAttendance:
             self.log(f"[GSM] Port not open. Skipping SMS to {phone}")
             return
 
+        # Clean phone number (remove spaces, dashes)
+        phone = phone.replace(" ", "").replace("-", "").strip()
+        
+        # Auto-format for Sri Lanka to international format (+94)
+        if phone.startswith("0"):
+            phone = "+94" + phone[1:]
+        elif phone.startswith("94"):
+            phone = "+" + phone
+
         self.log(f"[GSM] Sending SMS to {phone}")
         try:
             self.gsm_serial.write(b"AT+CMGF=1\r\n")
-            time.sleep(0.2)
+            time.sleep(0.5)
             cmd = f'AT+CMGS="{phone}"\r\n'
             self.gsm_serial.write(cmd.encode())
-            time.sleep(0.2)
+            time.sleep(0.5)
             self.gsm_serial.write(message.encode())
+            time.sleep(0.2)
             self.gsm_serial.write(bytes([26])) # Ctrl+Z
             self.log("[GSM] Command sent.")
         except Exception as e:
@@ -211,8 +266,8 @@ class SmartAttendance:
         if status == self.reader.MI_OK:
             (status, uid) = self.reader.MFRC522_Anticoll()
             if status == self.reader.MI_OK:
-                # Construct UID format "19,127,222,53"
-                return f"{uid[0]},{uid[1]},{uid[2]},{uid[3]}"
+                # Construct UID format "19-127-222-53" to prevent Google Sheets from treating it as a large number
+                return f"{uid[0]}-{uid[1]}-{uid[2]}-{uid[3]}"
         return None
 
     def start_scanning(self):

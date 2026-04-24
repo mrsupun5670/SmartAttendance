@@ -2,8 +2,8 @@
 Type=Application
 Name=Smart Attendance
 Comment=Launch Attendance System
-Exec=python3 /home/pi/SmartAttendance/gui_app.py
-Path=/home/pi/SmartAttendance/
+Exec=python3 /home/school/SmartAttendance/gui_app.py
+Path=/home/school/SmartAttendance/
 Icon=/usr/share/pixmaps/python.xpm
 Terminal=false
 Categories=Utility;
